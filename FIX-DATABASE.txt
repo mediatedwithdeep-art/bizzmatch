@@ -1,0 +1,79 @@
+==================================================================
+ FIX "Database is not ready" ON VERCEL  —  ~5 minutes
+==================================================================
+
+Your app is deployed but has no database. Vercel's servers can't use
+the old SQLite file (their disk is temporary). This project is now
+PostgreSQL. Do these 3 things:
+
+------------------------------------------------------------------
+ STEP 1 — Create a free Postgres database (Neon)   ~2 min
+------------------------------------------------------------------
+1. Go to  https://neon.tech  → sign in with GitHub (free).
+2. Click "Create project" (any name, e.g. bizmatch). Region: pick
+   the one closest to you.
+3. On the project dashboard, find "Connection string" and copy it.
+   It looks like:
+     postgresql://neondb_owner:XXXX@ep-cool-name-123.us-east-2.aws.neon.tech/neondb?sslmode=require
+   COPY THE WHOLE THING. (Make sure it ends with ?sslmode=require)
+
+   (Supabase works too: New project → Settings → Database →
+    "Connection string" → URI. Same idea.)
+
+------------------------------------------------------------------
+ STEP 2 — Add Environment Variables in Vercel      ~1 min
+------------------------------------------------------------------
+Vercel → your project → Settings → Environment Variables.
+Add these THREE (Environment: check Production, Preview, Development):
+
+  NAME            VALUE
+  ------------    ------------------------------------------------
+  DATABASE_URL    <paste the Neon connection string from Step 1>
+  AUTH_SECRET     <any long random text, 40+ chars — see below>
+  ID_HASH_SALT    <another long random text, 20+ chars>
+
+Need random values? Run this locally and copy each line:
+  node -e "console.log('AUTH_SECRET=' + require('crypto').randomBytes(48).toString('base64'))"
+  node -e "console.log('ID_HASH_SALT=' + require('crypto').randomBytes(32).toString('base64'))"
+
+(Optional but recommended)
+  APP_URL         https://YOUR-APP.vercel.app   (your live URL)
+
+------------------------------------------------------------------
+ STEP 3 — Redeploy                                 ~2 min
+------------------------------------------------------------------
+Vercel → Deployments → latest → "..." menu → Redeploy.
+
+That's it. The build automatically:
+  • generates the Prisma client,
+  • creates all tables in your Neon database (prisma db push),
+  • seeds demo accounts (only on the first, empty run).
+
+When it finishes, open your live URL and sign in:
+
+  Admin  :  deepsolanki0174@gmail.com   password: Deep@1234
+  Member :  deep@bizmatch.demo          password: Deep@1234
+  Or just tap "Create business account" and sign up fresh.
+
+==================================================================
+ VERIFIED: on real PostgreSQL, all of these were tested and pass —
+ signup → dashboard, login, admin login, forgot-password,
+ reset-password (old password rejected, new one works, token
+ single-use), swipe → match → chat, logout, and re-login.
+==================================================================
+
+ RUN IT LOCALLY (optional)
+ -------------------------
+ 1. Put the SAME three values in a file named  .env  in the project root:
+        DATABASE_URL="postgresql://...your Neon URL..."
+        AUTH_SECRET="...long random..."
+        ID_HASH_SALT="...long random..."
+ 2. npm install
+ 3. npm run preview        (builds, sets up the DB, starts on :3000)
+    - or -  npm run dev     (for editing with live reload)
+
+ Useful commands:
+   npx prisma db push       # create/update tables from the schema
+   npm run db:seed          # load demo accounts
+   npx prisma studio        # browse your database in a GUI
+==================================================================

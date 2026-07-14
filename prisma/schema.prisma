@@ -1,0 +1,228 @@
+// BizMatch data model — production MVP.
+// PostgreSQL (Neon / Supabase / any Postgres). Set DATABASE_URL in your
+// environment (locally in .env, on Vercel in Project → Settings → Env Vars).
+// Enums are validated strings (constants in src/lib/constants.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String
+  role            String    @default("USER") // USER | ADMIN | SUPER_ADMIN
+  emailVerifiedAt DateTime?
+  suspendedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  profile        BusinessProfile?
+  tokens         AuthToken[]
+  swipesGiven    Swipe[]          @relation("SwipesGiven")
+  swipesReceived Swipe[]          @relation("SwipesReceived")
+  connectionsA   Connection[]     @relation("ConnectionsA")
+  connectionsB   Connection[]     @relation("ConnectionsB")
+  messages       Message[]
+  notifications  Notification[]
+  savedProfiles  SavedProfile[]   @relation("Saver")
+  savedBy        SavedProfile[]   @relation("Saved")
+  following      Follow[]         @relation("Follower")
+  followers      Follow[]         @relation("Followed")
+  blocksGiven    Block[]          @relation("Blocker")
+  blocksReceived Block[]          @relation("Blocked")
+  reportsFiled   Report[]         @relation("Reporter")
+  reportsAgainst Report[]         @relation("Reported")
+  auditLogs      AuditLog[]
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+// Hashed single-use / rotating tokens: refresh sessions, email verification,
+// password resets.
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // REFRESH | EMAIL_VERIFY | PASSWORD_RESET
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model BusinessProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Required at signup
+  companyName String
+  industry    String
+  country     String
+  city        String
+
+  // Optional — filled in later; drives the completeness score
+  state    String?
+  about    String?
+  products String?
+  goals    String?
+  website  String?
+  size     String? // team size bucket, free text
+
+  // Future verification framework (disabled by default via VERIFICATION_ENABLED)
+  gstin           String?
+  pan             String?
+  aadhaarLast4    String?
+  aadhaarHash     String?
+  status          String    @default("ACTIVE") // ACTIVE | PENDING_VERIFICATION | VERIFIED | SUSPENDED
+  rejectionReason String?
+  verifiedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([industry, country, city])
+  @@index([country, city])
+  @@index([createdAt])
+}
+
+model Swipe {
+  id        String   @id @default(cuid())
+  swiperId  String
+  targetId  String
+  direction String // INTERESTED | SKIP
+  createdAt DateTime @default(now())
+
+  swiper User @relation("SwipesGiven", fields: [swiperId], references: [id], onDelete: Cascade)
+  target User @relation("SwipesReceived", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([swiperId, targetId])
+  @@index([targetId, direction])
+  @@index([createdAt])
+}
+
+// A mutual "INTERESTED" swipe. userAId < userBId so each pair is unique.
+model Connection {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+
+  userA    User      @relation("ConnectionsA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("ConnectionsB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model Message {
+  id           String   @id @default(cuid())
+  connectionId String
+  senderId     String
+  body         String
+  createdAt    DateTime @default(now())
+
+  connection Connection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  sender     User       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // MATCH | MESSAGE | VERIFICATION_APPROVED | VERIFICATION_REJECTED | FOLLOW | SYSTEM
+  title     String
+  body      String
+  href      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
+}
+
+model SavedProfile {
+  id        String   @id @default(cuid())
+  ownerId   String
+  targetId  String
+  createdAt DateTime @default(now())
+
+  owner  User @relation("Saver", fields: [ownerId], references: [id], onDelete: Cascade)
+  target User @relation("Saved", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, targetId])
+  @@index([ownerId, createdAt])
+}
+
+model Follow {
+  id         String   @id @default(cuid())
+  followerId String
+  targetId   String
+  createdAt  DateTime @default(now())
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  target   User @relation("Followed", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, targetId])
+  @@index([targetId])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  targetId  String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  target  User @relation("Blocked", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, targetId])
+  @@index([targetId])
+}
+
+model Report {
+  id         String    @id @default(cuid())
+  reporterId String
+  targetId   String
+  reason     String
+  detail     String?
+  status     String    @default("OPEN") // OPEN | RESOLVED | DISMISSED
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  target   User @relation("Reported", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([targetId])
+}
+
+// Append-only audit trail for security-relevant and admin actions.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String // e.g. auth.signup, auth.login, admin.user.suspend
+  targetId  String?
+  meta      String? // JSON payload
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([actorId, createdAt])
+}

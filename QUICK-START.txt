@@ -1,0 +1,68 @@
+==================================================
+ BizMatch — QUICK START
+==================================================
+
+IMPORTANT: Extract this ZIP into a NEW, EMPTY folder.
+Do NOT mix it with any older BizMatch folder — old
+files and an old database cause errors and can show
+an outdated design.
+
+This app uses PostgreSQL. You need a free database URL first
+(2 min): https://neon.tech → sign in with GitHub → create
+project → copy the connection string.
+
+STEP 1 — create a file named  .env  in this folder:
+
+    DATABASE_URL="postgresql://...your Neon URL...?sslmode=require"
+    AUTH_SECRET="any-long-random-string-40-plus-characters"
+    ID_HASH_SALT="another-long-random-string"
+    APP_URL="http://localhost:3000"
+
+STEP 2 — run (2 commands):
+
+    npm install
+    npm run preview
+
+Then open  http://localhost:3000
+
+"preview" builds the app, creates all database tables,
+seeds demo businesses, and starts the server. Pages load
+instantly.
+
+Deploying to Vercel instead? See FIX-DATABASE.txt.
+
+--------------------------------------------------
+ ALTERNATIVE — for editing code (live reload)
+--------------------------------------------------
+
+    npm install
+    npm run dev
+
+This also works, but the FIRST time you open each page
+it can take a few seconds to compile (perfectly normal
+for Next.js in development mode — it is not stuck).
+After that first visit, pages are instant. If you're
+just trying out the finished app, use "npm run preview"
+above instead.
+
+--------------------------------------------------
+ LOGINS (password for owner accounts: Deep@1234)
+--------------------------------------------------
+ Your admin      : deepsolanki0174@gmail.com
+ Your member     : deep@bizmatch.demo
+ Demo member     : priya@textilehub.demo   (demo1234)
+ Demo super admin: admin@bizmatch.demo     (demo1234)
+
+--------------------------------------------------
+ NEW USERS
+--------------------------------------------------
+ Signup asks only: name, email, password, company,
+ industry, country, city — then goes STRAIGHT to the
+ app. No documents, no approval, no waiting.
+
+--------------------------------------------------
+ PHONE ACCESS / DEPLOY
+--------------------------------------------------
+ See DEPLOY.md  (phone needs your computer's WiFi IP,
+ not "localhost"; Vercel needs a free Postgres DB).
+==================================================
