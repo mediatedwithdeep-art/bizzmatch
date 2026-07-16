@@ -1,0 +1,69 @@
+==================================================================
+ WHAT'S NEW  +  HOW TO PUT IT LIVE
+==================================================================
+
+NEW FEATURES ADDED (all tested and working):
+
+1. MESSAGE ANYONE — NO MATCH NEEDED
+   - New "Browse" tab: a scrollable list of every business.
+   - Tap any business to open its profile (about, products, goals).
+   - Tap the "Message" button to start a live chat instantly —
+     you do NOT need to swipe or match first.
+
+2. MESSAGES SECTION
+   - The bottom tab is now "Messages" (was "Network").
+   - It lists all your conversations with the latest message.
+
+3. LIVE CHAT
+   - Messages refresh every 1.5 seconds so conversations feel live.
+   - Works both ways: the other business sees your message and
+     can reply.
+
+------------------------------------------------------------------
+ HOW TO ADD YOUR LOGO (you do this — takes 30 seconds)
+------------------------------------------------------------------
+The app shows its logo from ONE file:  public/logo-mark.svg
+
+To use YOUR logo:
+  • If your logo is a PNG/JPG:
+      1. Put your image file in the  public/  folder.
+      2. Rename it to  logo-mark.png
+      3. Open  src/components/Logo.tsx  and change this line:
+             src="/logo-mark.svg"
+         to:
+             src="/logo-mark.png"
+  • If your logo is an SVG:
+      Just replace  public/logo-mark.svg  with your file
+      (keep the same name). Nothing else to change.
+
+  (Optional) Browser-tab icon: replace  src/app/icon.svg  with
+  your logo too.
+
+------------------------------------------------------------------
+ HOW TO PUT ALL THIS LIVE ON YOUR SITE
+------------------------------------------------------------------
+Your app auto-deploys from your GitHub repo (bizzmatch) to Vercel.
+So you just push the new code and Vercel redeploys automatically.
+
+1. Extract the ZIP I sent into your project folder (replace the
+   old files — or extract into a fresh folder and copy over).
+
+2. Open the folder in VS Code, open the terminal (Ctrl + `), and run:
+
+       git add .
+       git commit -m "Add direct messaging + browse + logo slot"
+       git push
+
+3. Vercel detects the push and redeploys automatically (~2 min).
+   Open your live URL — the new Browse + Messages features are there.
+
+   (Your database and environment variables stay exactly as they
+    are — nothing to change there. This is only app code.)
+
+------------------------------------------------------------------
+ TRY IT AFTER DEPLOY
+------------------------------------------------------------------
+  • Sign in, tap "Browse", tap any business, tap "Message".
+  • Open a second account (or ask a friend to sign up) and reply —
+    you'll see messages appear live on both sides.
+==================================================================
