@@ -1,30 +1,52 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { ADMIN_ROLES, PROFILE_STATUS } from "@/lib/constants";
-import { BottomNav } from "@/components/BottomNav";
+import type { Metadata, Viewport } from "next";
+import { Inter, Space_Grotesk } from "next/font/google";
+import { Toaster } from "@/components/Toaster";
+import "./globals.css";
 
-/**
- * Shell for members. No approval gate — signup lands here directly.
- * Legacy accounts without a profile finish company details first;
- * suspended accounts are shown the door.
- */
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  if ((ADMIN_ROLES as string[]).includes(session.role)) redirect("/admin");
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
 
-  const profile = await db.businessProfile.findUnique({
-    where: { userId: session.sub },
-    select: { status: true },
-  });
-  if (!profile) redirect("/onboarding");
-  if (profile.status === PROFILE_STATUS.SUSPENDED) redirect("/login");
+export const metadata: Metadata = {
+  title: { default: "BizMatch — Verified B2B Networking", template: "%s · BizMatch" },
+  description:
+    "A private network of real business owners. Sign up in a minute, swipe to discover businesses by industry and city, and unlock chat the moment you match.",
+  keywords: ["B2B networking", "business matching", "swipe to connect", "business owners network"],
+  openGraph: {
+    title: "BizMatch — Verified B2B Networking",
+    description: "Swipe. Match. Do business. A private network of real business owners.",
+    type: "website",
+    siteName: "BizMatch",
+  },
+  twitter: {
+    card: "summary",
+    title: "BizMatch — Verified B2B Networking",
+    description: "Swipe. Match. Do business. A private network of real business owners.",
+  },
+};
 
+export const viewport: Viewport = {
+  themeColor: "#07060d",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col pb-[86px]">{children}</div>
-      <BottomNav />
-    </div>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <body>
+        <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">{children}</div>
+        <Toaster />
+      </body>
+    </html>
   );
 }

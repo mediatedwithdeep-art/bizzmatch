@@ -1,220 +1,340 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { api } from "@/lib/client";
-import { toast } from "@/components/Toaster";
-import { Monogram } from "@/components/BusinessCard";
-import { VerifiedBadge } from "@/components/Logo";
+import { api, timeAgo } from "@/lib/client";
+import { Logo } from "@/components/Logo";
+import { LogoutButton } from "@/components/LogoutButton";
 import { RowSkeletons } from "@/components/Skeletons";
-import { INDUSTRIES } from "@/lib/constants";
+import { toast } from "@/components/Toaster";
 
-type Person = {
-  userId: string;
-  companyName: string;
-  ownerName: string;
-  industry: string;
-  country: string;
-  city: string;
-  state: string | null;
-  about: string | null;
-  products: string | null;
-  goals: string | null;
-  verified: boolean;
+type Analytics = {
+  totals: {
+    users: number;
+    activeProfiles: number;
+    verifiedProfiles: number;
+    connections: number;
+    messages: number;
+    swipes: number;
+    openReports: number;
+  };
+  last7d: { signups: number; swipes: number; matches: number; messages: number };
+  topIndustries: { industry: string; count: number }[];
 };
 
-const ease = [0.22, 1, 0.36, 1] as const;
+type Application = {
+  id: string;
+  companyName: string;
+  industry: string;
+  city: string;
+  country: string;
+  gstin: string | null;
+  pan: string | null;
+  aadhaarLast4: string | null;
+  createdAt: string;
+  user: { email: string; name: string };
+};
 
-/**
- * Browse every business and message anyone directly — no swipe/match required.
- * Tap a card to expand the full profile; tap Message to open a live chat.
- */
-export default function SearchPage() {
-  const router = useRouter();
-  const [industry, setIndustry] = useState("");
-  const [city, setCity] = useState("");
-  const [q, setQ] = useState("");
-  const [people, setPeople] = useState<Person[] | null>(null);
-  const [openFilters, setOpenFilters] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+type Report = {
+  id: string;
+  reason: string;
+  detail: string | null;
+  createdAt: string;
+  reporter: { email: string; company?: string | null };
+  target: { userId: string; email: string; company?: string | null };
+};
+
+type AdminUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  suspendedAt: string | null;
+  createdAt: string;
+  profile: { companyName: string; industry: string; country: string; city: string; status: string } | null;
+};
+
+const TABS = ["Overview", "Verifications", "Reports", "Users"] as const;
+
+export default function AdminPage() {
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+
+  return (
+    <main className="flex-1 px-5 py-5">
+      <header className="mb-1 flex items-center justify-between">
+        <Logo />
+        <LogoutButton className="text-sm font-semibold text-ink-300 underline underline-offset-4" />
+      </header>
+      <h1 className="display mt-5 text-[21px]">Admin dashboard</h1>
+
+      <div className="mt-4 mb-5 flex flex-wrap gap-2">
+        {TABS.map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? "chip-active" : ""}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === "Overview" && <Overview />}
+      {tab === "Verifications" && <Verifications />}
+      {tab === "Reports" && <Reports />}
+      {tab === "Users" && <Users />}
+    </main>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="card flex-1 px-3 py-3.5 text-center">
+      <div className="grad-text text-[22px] font-extrabold tabular-nums">{value.toLocaleString()}</div>
+      <div className="mt-0.5 text-[10.5px] font-semibold text-ink-400">{label}</div>
+    </div>
+  );
+}
+
+function Overview() {
+  const [data, setData] = useState<Analytics | null>(null);
+  useEffect(() => {
+    api<Analytics>("/api/admin/analytics").then(setData).catch(() => {});
+  }, []);
+  if (!data) return <RowSkeletons count={3} />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2.5">
+        <Stat label="Members" value={data.totals.users} />
+        <Stat label="Connections" value={data.totals.connections} />
+        <Stat label="Messages" value={data.totals.messages} />
+      </div>
+      <div className="flex gap-2.5">
+        <Stat label="Swipes" value={data.totals.swipes} />
+        <Stat label="Verified" value={data.totals.verifiedProfiles} />
+        <Stat label="Open reports" value={data.totals.openReports} />
+      </div>
+      <section className="card p-4">
+        <h2 className="sec-label">Last 7 days</h2>
+        <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13.5px] text-ink-200">
+          <p>Signups: <b className="tabular-nums">{data.last7d.signups}</b></p>
+          <p>Matches: <b className="tabular-nums">{data.last7d.matches}</b></p>
+          <p>Swipes: <b className="tabular-nums">{data.last7d.swipes}</b></p>
+          <p>Messages: <b className="tabular-nums">{data.last7d.messages}</b></p>
+        </div>
+      </section>
+      <section className="card p-4">
+        <h2 className="sec-label">Top industries</h2>
+        <ul className="mt-2 space-y-1.5">
+          {data.topIndustries.map((i) => (
+            <li key={i.industry} className="flex justify-between text-[13.5px] text-ink-200">
+              {i.industry} <b className="tabular-nums">{i.count}</b>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function Verifications() {
+  const [apps, setApps] = useState<Application[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async (params: URLSearchParams) => {
-    setPeople(null);
-    try {
-      const { people } = await api<{ people: Person[] }>(`/api/people?${params}`);
-      setPeople(people);
-    } catch {
-      setPeople([]);
-      toast("Could not load businesses", "error");
-    }
+  const load = useCallback(() => {
+    api<{ applications: Application[] }>("/api/admin/verifications")
+      .then((d) => setApps(d.applications))
+      .catch(() => setApps([]));
   }, []);
+  useEffect(load, [load]);
 
-  useEffect(() => {
-    load(new URLSearchParams());
-  }, [load]);
-
-  function apply(e: React.FormEvent) {
-    e.preventDefault();
-    const params = new URLSearchParams();
-    if (industry) params.set("industry", industry);
-    if (city.trim()) params.set("city", city.trim());
-    if (q.trim()) params.set("q", q.trim());
-    load(params);
-    setOpenFilters(false);
-  }
-
-  async function message(userId: string) {
-    setBusyId(userId);
+  async function decide(id: string, action: "APPROVE" | "REJECT") {
+    let reason: string | undefined;
+    if (action === "REJECT") {
+      reason = window.prompt("Reason (shown to the applicant):") ?? undefined;
+      if (reason === undefined) return;
+    }
+    setBusyId(id);
     try {
-      const { connectionId } = await api<{ connectionId: string }>("/api/conversations", {
-        method: "POST",
-        body: { targetUserId: userId },
-      });
-      router.push(`/chat/${connectionId}`);
+      await api(`/api/admin/verifications/${id}`, { method: "POST", body: { action, reason } });
+      setApps((a) => a?.filter((x) => x.id !== id) ?? null);
+      toast(action === "APPROVE" ? "Verified ✓" : "Rejected");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not open chat", "error");
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    } finally {
       setBusyId(null);
     }
   }
 
-  const activeCount = [industry, city.trim(), q.trim()].filter(Boolean).length;
+  if (apps === null) return <RowSkeletons count={3} />;
+  if (apps.length === 0) {
+    return (
+      <p className="py-12 text-center text-sm text-ink-400">
+        No pending verifications. (Document verification is currently{" "}
+        <span className="text-ink-200">optional</span> — submissions appear here when enabled.)
+      </p>
+    );
+  }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center justify-between px-5 pt-5 pb-3">
-        <h1 className="display text-[21px]">Browse &amp; message</h1>
-        <button
-          className={`chip ${activeCount ? "chip-active" : ""}`}
-          onClick={() => setOpenFilters((o) => !o)}
-        >
-          {openFilters ? "Hide filters" : `Filters${activeCount ? ` · ${activeCount}` : ""}`}
-        </button>
-      </header>
-
-      <AnimatePresence initial={false}>
-        {openFilters && (
-          <motion.form
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease }}
-            onSubmit={apply}
-            className="overflow-hidden px-5"
-          >
-            <div className="space-y-3 pb-4">
-              <input
-                className="input"
-                placeholder="Keywords — products, goals, company…"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <select className="input" value={industry} onChange={(e) => setIndustry(e.target.value)}>
-                  <option value="">All industries</option>
-                  {INDUSTRIES.map((i) => (
-                    <option key={i} value={i}>{i}</option>
-                  ))}
-                </select>
-                <input
-                  className="input"
-                  placeholder="City"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                />
-              </div>
-              <button className="btn-primary w-full">Apply filters</button>
+    <ul className="space-y-3 pb-6">
+      {apps.map((a) => (
+        <li key={a.id} className="card space-y-3 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[15px] font-bold">{a.companyName}</p>
+              <p className="text-[13px] text-ink-300">{a.user.name} · {a.user.email}</p>
             </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
-
-      {people === null ? (
-        <RowSkeletons count={5} />
-      ) : people.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-10 text-center">
-          <div className="glow-gold flex h-20 w-20 items-center justify-center rounded-full bg-gold-500/10 text-3xl">
-            🔍
+            <span className="shrink-0 text-[10.5px] text-ink-400">{timeAgo(a.createdAt)}</span>
           </div>
-          <p className="max-w-xs text-sm leading-relaxed text-ink-300">
-            No businesses match. Try clearing the filters.
-          </p>
-        </div>
-      ) : (
-        <ul className="space-y-2.5 px-4 pb-4">
-          {people.map((p, i) => {
-            const isOpen = expanded === p.userId;
-            return (
-              <motion.li
-                key={p.userId}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.3), ease }}
-                className="card overflow-hidden"
-              >
-                <button
-                  className="flex w-full items-center gap-3.5 p-3.5 text-left"
-                  onClick={() => setExpanded(isOpen ? null : p.userId)}
-                >
-                  <Monogram name={p.companyName} size="h-12 w-12 text-base" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-[14.5px] font-bold">{p.companyName}</p>
-                      {p.verified && <VerifiedBadge />}
-                    </div>
-                    <p className="mt-0.5 truncate text-[13px] text-ink-300">
-                      {p.industry} · {[p.city, p.state ?? p.country].filter(Boolean).join(", ")}
-                    </p>
-                  </div>
-                  <span className={`text-ink-400 transition-transform ${isOpen ? "rotate-90" : ""}`}>›</span>
-                </button>
+          <div className="flex flex-wrap gap-2">
+            <span className="chip">{a.industry}</span>
+            <span className="chip">{a.city}, {a.country}</span>
+          </div>
+          <dl className="grid grid-cols-3 gap-2 rounded-xl bg-ink-900 p-3 text-center shadow-[0_0_0_1px_var(--color-ink-700)]">
+            <Doc label="GSTIN" value={a.gstin ?? "—"} />
+            <Doc label="PAN" value={a.pan ?? "—"} />
+            <Doc label="Aadhaar" value={a.aadhaarLast4 ? `••${a.aadhaarLast4}` : "—"} />
+          </dl>
+          <div className="flex gap-2.5">
+            <button disabled={busyId === a.id} onClick={() => decide(a.id, "REJECT")} className="btn-danger flex-1 !py-2.5 !text-sm">
+              Reject
+            </button>
+            <button disabled={busyId === a.id} onClick={() => decide(a.id, "APPROVE")} className="btn-primary flex-1 !py-2.5 !text-sm">
+              Approve
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease }}
-                      className="overflow-hidden"
-                    >
-                      <div className="space-y-3 px-3.5 pb-3.5">
-                        <p className="text-[12.5px] text-ink-400">Owner: {p.ownerName}</p>
-                        {p.about && (
-                          <div>
-                            <h3 className="sec-label">About</h3>
-                            <p className="text-[13.5px] leading-relaxed text-ink-200">{p.about}</p>
-                          </div>
-                        )}
-                        {p.products && (
-                          <div>
-                            <h3 className="sec-label">Products &amp; services</h3>
-                            <p className="text-[13.5px] leading-relaxed text-ink-200">{p.products}</p>
-                          </div>
-                        )}
-                        {p.goals && (
-                          <div>
-                            <h3 className="sec-label">Looking for</h3>
-                            <p className="text-[13.5px] leading-relaxed text-ink-200">{p.goals}</p>
-                          </div>
-                        )}
-                        <button
-                          className="btn-primary w-full"
-                          disabled={busyId === p.userId}
-                          onClick={() => message(p.userId)}
-                        >
-                          {busyId === p.userId ? "Opening…" : "💬 Message"}
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.li>
-            );
-          })}
-        </ul>
+function Reports() {
+  const [reports, setReports] = useState<Report[] | null>(null);
+
+  const load = useCallback(() => {
+    api<{ reports: Report[] }>("/api/admin/reports")
+      .then((d) => setReports(d.reports))
+      .catch(() => setReports([]));
+  }, []);
+  useEffect(load, [load]);
+
+  async function resolve(id: string, status: "RESOLVED" | "DISMISSED") {
+    try {
+      await api(`/api/admin/reports/${id}`, { method: "PATCH", body: { status } });
+      setReports((r) => r?.filter((x) => x.id !== id) ?? null);
+      toast(status === "RESOLVED" ? "Report resolved" : "Report dismissed");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    }
+  }
+
+  if (reports === null) return <RowSkeletons count={3} />;
+  if (reports.length === 0) {
+    return <p className="py-12 text-center text-sm text-ink-400">No open reports. 🎉</p>;
+  }
+
+  return (
+    <ul className="space-y-3 pb-6">
+      {reports.map((r) => (
+        <li key={r.id} className="card space-y-2.5 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[14px] font-bold">
+              {r.reason.replace(/_/g, " ")} — {r.target.company ?? r.target.email}
+            </p>
+            <span className="shrink-0 text-[10.5px] text-ink-400">{timeAgo(r.createdAt)}</span>
+          </div>
+          {r.detail && <p className="text-[13px] leading-relaxed text-ink-300">{r.detail}</p>}
+          <p className="text-[12px] text-ink-400">Reported by {r.reporter.company ?? r.reporter.email}</p>
+          <div className="flex gap-2.5">
+            <button onClick={() => resolve(r.id, "DISMISSED")} className="btn-ghost flex-1 !py-2 !text-sm">
+              Dismiss
+            </button>
+            <button onClick={() => resolve(r.id, "RESOLVED")} className="btn-primary flex-1 !py-2 !text-sm">
+              Resolve
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Users() {
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [q, setQ] = useState("");
+
+  const load = useCallback((query: string) => {
+    api<{ users: AdminUser[] }>(`/api/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`)
+      .then((d) => setUsers(d.users))
+      .catch(() => setUsers([]));
+  }, []);
+  useEffect(() => load(""), [load]);
+
+  async function toggleSuspend(u: AdminUser) {
+    try {
+      await api(`/api/admin/users/${u.id}`, {
+        method: "PATCH",
+        body: { suspended: !u.suspendedAt },
+      });
+      toast(u.suspendedAt ? "Account restored" : "Account suspended");
+      load(q);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed", "error");
+    }
+  }
+
+  return (
+    <div className="space-y-3 pb-6">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          load(q);
+        }}
+        className="flex gap-2"
+      >
+        <input className="input flex-1" placeholder="Search email, name, company…" value={q}
+          onChange={(e) => setQ(e.target.value)} />
+        <button className="btn-ghost !px-4">Search</button>
+      </form>
+
+      {users === null ? (
+        <RowSkeletons count={4} />
+      ) : (
+        users.map((u) => (
+          <div key={u.id} className="card flex items-center gap-3 p-3.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] font-bold">
+                {u.profile?.companyName ?? u.name}
+                {u.role !== "USER" && (
+                  <span className="chip ml-2 !px-2 !py-0 !text-[9.5px]">{u.role}</span>
+                )}
+                {u.suspendedAt && (
+                  <span className="ml-2 text-[10px] font-bold text-rose-500">SUSPENDED</span>
+                )}
+              </p>
+              <p className="truncate text-[12px] text-ink-400">
+                {u.email} · {u.profile ? `${u.profile.city}, ${u.profile.country}` : "no profile"} ·{" "}
+                {timeAgo(u.createdAt)}
+              </p>
+            </div>
+            {u.role === "USER" && (
+              <button
+                onClick={() => toggleSuspend(u)}
+                className={`shrink-0 !py-1.5 !px-3 !text-[12px] ${u.suspendedAt ? "btn-ghost" : "btn-danger"}`}
+              >
+                {u.suspendedAt ? "Restore" : "Suspend"}
+              </button>
+            )}
+          </div>
+        ))
       )}
-    </main>
+    </div>
+  );
+}
+
+function Doc({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="overline-label !text-[9px]">{label}</dt>
+      <dd className="mt-1 font-mono text-[11px] break-all text-ink-200">{value}</dd>
+    </div>
   );
 }
